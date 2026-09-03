@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using TodoApi.Common;
+using TodoApi.DTO;
 using TodoApi.Models;
 using TodoApi.Services;
 
@@ -6,117 +8,82 @@ namespace TodoApi.Controllers
 {
     [ApiController]
     [Route("api")]
-    public class TodoController : ControllerBase
+    public class TodosController : ControllerBase
     {
-        public TodoController()
+        private readonly ITodoService _service;
+        private readonly ILogger<TodosController> _logger;
+
+        public TodosController(ITodoService service, ILogger<TodosController> logger)
         {
+            _service = service;
+            _logger = logger;
         }
 
-        [HttpPost("createTodo")]
-        public IActionResult CreateTodo([FromBody] Todo todo)
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] TodoCreateDTO dto, CancellationToken ct = default)
         {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var todo = new Todo
+            {
+                Title = dto.Title,
+                Description = dto.Description,
+                IsCompleted = dto.IsCompleted
+            };
+
             try
             {
-                var todoService = new TodoService();
-                var result = todoService.CreateTodo(todo);
-                return Ok(result);
+                var created = await _service.CreateAsync(todo, ct);
+                return CreatedAtAction(nameof(GetById), new { id = created.Id }, Mapper.MapToReadDto(created));
             }
-            catch (Exception ex)
+            catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogWarning(ex, "Validation failed while creating todo");
+                return BadRequest(new { error = ex.Message });
             }
         }
 
-        [HttpPost("getTodo")]
-        public IActionResult GetTodo([FromBody] GetTodoRequest request)
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<TodoReadDTO>>> GetAll(CancellationToken ct = default)
         {
-            try
-            {
-                var todoService = new TodoService();
-                if (request.Id.HasValue)
-                {
-                    var todo = todoService.GetTodoById(request.Id.Value);
-                    if (todo == null)
-                    {
-                        return NotFound();
-                    }
-                    return Ok(todo);
-                }
-                else
-                {
-                    var todos = todoService.GetAllTodos();
-                    return Ok(todos);
-                }
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var todos = await _service.GetAllAsync(ct);
+            return Ok(todos.Select(Mapper.MapToReadDto));
         }
 
-        [HttpPost("updateTodo")]
-        public IActionResult UpdateTodo([FromBody] UpdateTodoRequest request)
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<TodoReadDTO>> GetById(int id, CancellationToken ct = default)
         {
-            try
-            {
-                var todoService = new TodoService();
-                var existingTodo = todoService.GetTodoById(request.Id);
-                if (existingTodo == null)
-                {
-                    return NotFound();
-                }
-
-                var todo = new Todo
-                {
-                    Title = request.Title,
-                    Description = request.Description,
-                    IsCompleted = request.IsCompleted
-                };
-
-                var result = todoService.UpdateTodo(request.Id, todo);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var todo = await _service.GetByIdAsync(id, ct);
+            if (todo == null) return NotFound();
+            return Ok(Mapper.MapToReadDto(todo));
         }
 
-        [HttpPost("deleteTodo")]
-        public IActionResult DeleteTodo([FromBody] DeleteTodoRequest request)
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> Update(int id, [FromBody] TodoUpdateDTO dto, CancellationToken ct = default)
         {
-            try
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var update = new Todo
             {
-                var todoService = new TodoService();
-                var result = todoService.DeleteTodo(request.Id);
-                if (result)
-                {
-                    return Ok(new { message = "Todo deleted successfully" });
-                }
-                return NotFound();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+                Title = dto.Title,
+                Description = dto.Description,
+                IsCompleted = dto.IsCompleted
+            };
+
+            var updated = await _service.UpdateAsync(id, update, ct);
+            if (updated == null) return NotFound();
+            return Ok(Mapper.MapToReadDto(updated));
         }
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id, CancellationToken ct = default)
+        {
+            var deleted = await _service.DeleteAsync(id, ct);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+
+        
     }
 
-    public class GetTodoRequest
-    {
-        public int? Id { get; set; }
-    }
-
-    public class UpdateTodoRequest
-    {
-        public int Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public bool IsCompleted { get; set; }
-    }
-
-    public class DeleteTodoRequest
-    {
-        public int Id { get; set; }
-    }
 }

@@ -1,4 +1,8 @@
-using Microsoft.Data.Sqlite;
+
+using Microsoft.EntityFrameworkCore;
+using TodoApi.Repositories;
+using TodoApi.Repositories.Infrastructure;
+using TodoApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,9 +12,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var app = builder.Build();
+//Configure DbContext (appsettings.json: ConnectionStrings:DefaultConnection)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=todos.db";
+builder.Services.AddDbContext<TodoDbContext>(options =>
+    options.UseSqlServer(connectionString));
 
-InitializeDatabase();
+//InitializeDatabase(); Removing it since we are using EF Core migrations to handle database creation and updates.
+
+builder.Services.AddScoped<ITodoRepository, TodoRepository>();
+builder.Services.AddScoped<ITodoService, TodoService>();
+
+var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -27,23 +39,3 @@ app.MapControllers();
 
 app.Run();
 
-void InitializeDatabase()
-{
-    var connectionString = "Data Source=todos.db";
-    using var connection = new SqliteConnection(connectionString);
-    connection.Open();
-
-    var command = connection.CreateCommand();
-    command.CommandText = @"
-        CREATE TABLE IF NOT EXISTS Todos (
-            Id INTEGER PRIMARY KEY AUTOINCREMENT,
-            Title TEXT NOT NULL,
-            Description TEXT,
-            IsCompleted INTEGER NOT NULL DEFAULT 0,
-            CreatedAt TEXT NOT NULL
-        )
-    ";
-    command.ExecuteNonQuery();
-
-    Console.WriteLine("Database initialized successfully");
-}
