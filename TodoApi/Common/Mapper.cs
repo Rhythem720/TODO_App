@@ -5,8 +5,7 @@ namespace TodoApi.Common
 {
     public static class Mapper
     {
-        public static TodoReadDTO MapToReadDto(Todo t) =>
-            new TodoReadDTO
+        public static TodoReadDTO MapToReadDto(Todo t) =>new TodoReadDTO
             {
                 Id = t.Id,
                 Title = t.Title,
