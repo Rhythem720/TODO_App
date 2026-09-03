@@ -52,7 +52,7 @@ Separate API contracts from the persistence model.
 All dependencies are registered through ASP.NET Core DI, making the code easier to test and maintain.
 
 ### Exception Handling
-Unexpected exceptions are handled centrally using middleware and returned as `ProblemDetails`.
+Exceptions are handled using try -catch blocks .
 
 ### Why not Clean Architecture / CQRS / MediatR?
 For a small CRUD API with four core operations, these patterns would add unnecessary complexity. The chosen structure provides separation of concerns without over-engineering.
@@ -307,6 +307,10 @@ For a production deployment with schema evolution, introduce a proper migration 
 ### Integration tests
 
 Add API-level integration tests using `WebApplicationFactory` to validate the complete request pipeline.
+
+### GLobal Exception Handling
+
+Exceptions should be handled globally using middleware to ensure consistent error responses and logging.
 
 ### CI/CD
 
