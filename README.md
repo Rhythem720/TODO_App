@@ -1,123 +1,108 @@
-# TODO API Refactoring Exercise
+# TODO API
 
-## Overview
+A refactored ASP.NET Core CRUD API for managing todo items — RESTful endpoints, layered
+architecture (Controller → Service → Repository → EF Core), and a matching xUnit test suite.
 
-You've inherited a TODO API that was built quickly to meet a deadline. While it works, it needs significant refactoring to meet production standards. Your task is to refactor the codebase, fix architectural issues and add/fix unit tests.
+See [`SOLUTION.md`](./SOLUTION.md) for the problems identified in the original implementation,
+the architectural decisions and trade-offs behind this refactor, and future improvements.
 
-## Time Limit
+## Tech Stack
 
-**Maximum: 2 days**
+- .NET 8 / ASP.NET Core Web API
+- Entity Framework Core (SQL Server provider) with code-first migrations
+- Swagger / OpenAPI (Swashbuckle)
+- xUnit + Moq (unit tests) + `Microsoft.AspNetCore.Mvc.Testing` (integration tests, run against an
+  in-memory SQLite database so they don't require a real SQL Server instance — see `SOLUTION.md`
+  for that trade-off)
 
-You may submit earlier if you complete the requirements. Quality matters more than speed.
+## Prerequisites
 
-## Your Task
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- SQL Server or [SQL Server LocalDB](https://learn.microsoft.com/sql/database-engine/configure-windows/sql-server-express-localdb)
+  (the default connection string in `appsettings.json` targets `(localdb)\mssqllocaldb`;
+  update it — or the `TodoDb` connection string — to point at your own instance if needed)
+- (Optional) [SSMS](https://learn.microsoft.com/sql/ssms/download-sql-server-management-studio-ssms)
+  or Azure Data Studio to inspect the database
 
-1. **Review** the existing codebase
-2. **Identify** architectural and design problems
-3. **Refactor** the application following best practices
-4. **Document** your decisions and reasoning
+## Quick Start
 
-## Requirements
+The project already references the packages below in `TodoApi.csproj`, so a plain `dotnet restore`
+pulls them in — you only need the explicit `dotnet add package` commands if you're wiring EF Core
+into a project that doesn't have them yet:
 
-### Core Functionality
-The API should support basic TODO operations:
-- Create a new TODO item
-- Retrieve TODO items
-- Update an existing TODO item by id
-- Delete a TODO item by id
+```bash
+dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add package Microsoft.EntityFrameworkCore.Design
+```
 
-## Deliverables
+- `Microsoft.EntityFrameworkCore.SqlServer` — the SQL Server provider EF Core uses at runtime.
+- `Microsoft.EntityFrameworkCore.Design` — design-time tooling required for `dotnet ef migrations add`
+  and `dotnet ef database update` to work.
 
-### 1. Refactored Codebase
-A working application with all the improvements implemented.
+```bash
+# Restore dependencies
+dotnet restore
 
-### 2. Documentation
-Include a `SOLUTION.md` file that explains:
-- **Problems Identified**: What issues did you find in the original implementation?
-- **Architectural Decisions**: What architecture did you choose and why?
-- **How to Run**: Clear instructions for running the application and tests
-- **API Documentation**: How to use the endpoints
-- **Future Improvements**: What would you do if you had more time?
+# Install the EF Core CLI tool once, if you don't already have it
+dotnet tool install --global dotnet-ef --version 8.0.0
 
-### 3. Tests
-- Tests should be meaningful and test actual behavior
-- Include both positive and negative test cases
-- Tests should be maintainable and well-organized
+# Create the initial migration (first time only)
+dotnet ef migrations add InitialCreate --project TodoApi --startup-project TodoApi
+
+# Apply it to your SQL Server / LocalDB instance
+dotnet ef database update --project TodoApi --startup-project TodoApi
+
+# Build
+dotnet build
+
+# Run the API (from the TodoApi/ folder, or pass --project)
+dotnet run --project TodoApi
+
+# Run the tests
+dotnet test
+```
+
+The API listens on the URL shown in the console output (see `TodoApi/Properties/launchSettings.json`).
+With the app running in Development mode, open `/swagger` in a browser to explore and try the
+endpoints interactively.
+
+## API Endpoints
+
+| Method | Route              | Description                  |
+|--------|---------------------|-------------------------------|
+| POST   | `/api/todos`        | Create a new todo item        |
+| GET    | `/api/todos`        | Get all todo items            |
+| GET    | `/api/todos/{id}`   | Get a single todo item by id  |
+| PUT    | `/api/todos/{id}`   | Update an existing todo item  |
+| DELETE | `/api/todos/{id}`   | Delete a todo item            |
+
+Full request/response examples and status codes are documented in `SOLUTION.md`.
 
 ## Project Structure
 
 ```
-interview-problem/
-├── TodoApi/                  # Main API project
-│   ├── Controllers/          # API Controllers
-│   ├── Models/              # Data models
-│   ├── Services/            # Business logic
-│   └── Program.cs           # Application entry point
-├── TodoApi.Tests/           # Test project
-└── TodoApi.sln              # Solution file
+TodoApi/
+├── Controllers/    # Thin HTTP controllers - routing and status codes only
+├── Services/       # Business logic, DTO<->entity mapping
+├── Repositories/   # EF Core data access
+├── Data/           # DbContext
+├── Dtos/           # Request/response contracts (kept separate from the EF entity)
+├── Models/         # EF Core entity
+├── Exceptions/      # Domain exceptions (e.g. NotFoundException)
+├── Middleware/      # Centralized exception handling -> problem+json responses
+└── Program.cs       # Composition root (DI, pipeline)
+
+TodoApi.Tests/
+├── Services/        # Unit tests for the service layer (mocked repository)
+├── Controllers/      # Unit tests for the controller layer (mocked service)
+└── Integration/      # Full HTTP pipeline tests against an in-memory SQLite database
 ```
 
-## Getting Started
-
-### Step 1: Fork the Repository
-
-1. Navigate to the template repository: **https://github.com/madalincapris/dotnet-interview**
-2. Click the **"Fork"** button in the top-right corner of the page
-3. Select your personal GitHub account as the destination
-4. GitHub will create a copy of the repository under your account: `https://github.com/YOUR-USERNAME/iss-interview`
-
-### Step 2: Clone Your Fork
-
-Clone your forked repository to your local machine:
+## Testing
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/iss-interview.git
-cd iss-interview
+dotnet test
 ```
 
-### Step 3: Review and Understand the Code
-
-1. Review the existing code thoroughly
-2. Identify architectural issues and areas for improvement
-3. Build and run the project to understand current behavior:
-   ```bash
-   dotnet build
-   dotnet run --project TodoApi
-   ```
-4. Run the tests to see current test quality:
-   ```bash
-   dotnet test
-   ```
-
-### Step 4: Implement Your Solution
-
-1. Plan your refactoring approach
-2. Implement your changes incrementally
-3. Test as you go
-4. Commit your changes regularly with clear commit messages
-5. Document your decisions in `SOLUTION.md`
-
-## Submission
-
-### Step 1: Finalize Your Work
-
-1. Ensure all tests pass: `dotnet test`
-2. Complete your `SOLUTION.md` documentation
-3. Commit and push all changes to your forked repository:
-   ```bash
-   git add .
-   git commit -m "Complete refactoring exercise"
-   git push origin main
-   ```
-
-### Step 2: Submit Your Solution
-
-Send an email or message to the interviewer with:
-- **Link to your forked repository**: `https://github.com/YOUR-USERNAME/iss-interview`
-- Your name
-- Brief summary of your approach
-- Any additional context or notes
-
-## Questions?
-
-If you have clarifying questions about requirements, please reach out to our recruitment team.
+The suite covers both positive and negative cases per endpoint (found/not-found, valid/invalid
+input), plus a regression test proving the original SQL-injection vector is closed.
